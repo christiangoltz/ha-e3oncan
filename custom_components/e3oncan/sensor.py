@@ -24,7 +24,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import E3ConfigEntry
 from .const import DEVICE_E380, DEVICE_NAMES, DOMAIN, UNAVAILABLE_VALUES
-from .decoder import ValueInfo, is_ignored, parse_key
+from .decoder import ValueInfo, is_ignored, is_noise, parse_key
 from .hub import E3Hub
 
 DIAG_FRAMES = "diag_frames"
@@ -86,7 +86,7 @@ def _entity_name(info: ValueInfo) -> str:
 
 
 def _enabled_by_default(info: ValueInfo) -> bool:
-    if info.raw:
+    if info.raw or is_noise(info.path):
         return False
     if any(p.lower().startswith("unknown") for p in info.path):
         return False
@@ -156,7 +156,18 @@ async def async_setup_entry(
         if entities:
             async_add_entities(entities)
 
+    @callback
+    def _absent(did_key: str) -> None:
+        # sensor not connected: remove the entities of this data point
+        for reg_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
+            if not reg_entry.unique_id.startswith(prefix):
+                continue
+            key = reg_entry.unique_id[len(prefix) :]
+            if key == did_key or key.startswith(f"{did_key}/"):
+                registry.async_remove(reg_entry.entity_id)
+                created.discard(key)
     entry.async_on_unload(async_dispatcher_connect(hass, hub.signal_new, _new_values))
+    entry.async_on_unload(async_dispatcher_connect(hass, f"{hub.signal_new}_absent", _absent))
     # values that arrived before the dispatcher was connected
     _new_values(list(hub.infos.values()))
 

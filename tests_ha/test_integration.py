@@ -174,7 +174,10 @@ async def test_read_mode_vitocal(hass: HomeAssistant) -> None:
         ents = {e.unique_id.split("_", 1)[1]: e.entity_id for e in er.async_entries_for_config_entry(reg, entry.entry_id)}
         flow = hass.states.get(ents["268.9/Actual"])
         assert flow.state == "24.9" and flow.attributes["device_class"] == "temperature"
-        assert hass.states.get(ents["284.9/Actual"]).state == "unknown"
+        # not connected -> no entities at all for this data point
+        assert not any(k.startswith("284.9") for k in ents)
+        # the device's own minimum is created disabled
+        assert reg.async_get(ents["268.9/Minimum"]).disabled_by is er.RegistryEntryDisabler.INTEGRATION
         dev = __import__("homeassistant.helpers.device_registry", fromlist=["x"]).async_get(hass)
         model = next(iter(dev.devices.values())).model
         assert "read-only polling of ECU 0x680" in model
@@ -205,4 +208,26 @@ async def test_e380_names_two_meters(hass: HomeAssistant) -> None:
     assert hass.states.get(ents[f"{0x250}.8/Total"].entity_id).name == "Energy meter E380 1 Grid Active Power Total"
     assert ents[f"{0x25C}.8/ImportCumulated"].disabled_by is er.RegistryEntryDisabler.INTEGRATION
     with patch(PATCH_STOP):
+        assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_migration_disables_noise_and_absent_sensors_are_removed(hass: HomeAssistant) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN, version=1, minor_version=1,
+        data={"can_interface": "can0", "device": "vcal_read"}, options={"min_interval": 10},
+    )
+    entry.add_to_hass(hass)
+    reg = er.async_get(hass)
+    noisy = reg.async_get_or_create("sensor", DOMAIN, f"{entry.entry_id}_268.9/Average", config_entry=entry)
+    actual = reg.async_get_or_create("sensor", DOMAIN, f"{entry.entry_id}_268.9/Actual", config_entry=entry)
+    gone = reg.async_get_or_create("sensor", DOMAIN, f"{entry.entry_id}_286.9/Actual", config_entry=entry)
+    with patch("custom_components.e3oncan.poller.UdsPoller.start"), patch("custom_components.e3oncan.poller.UdsPoller.stop"):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        assert entry.minor_version == 2
+        assert reg.async_get(noisy.entity_id).disabled_by is er.RegistryEntryDisabler.INTEGRATION
+        assert reg.async_get(actual.entity_id).disabled_by is None
+        entry.runtime_data._on_payload("286", struct.pack("<hhhhB", -32768, -32768, -32768, -32768, 0))
+        await hass.async_block_till_done()
+        assert reg.async_get(gone.entity_id) is None
         assert await hass.config_entries.async_unload(entry.entry_id)

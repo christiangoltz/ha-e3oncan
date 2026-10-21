@@ -58,6 +58,7 @@ class E3onCANConfigFlow(ConfigFlow, domain=DOMAIN):
     """Set up listening for one device type on one CAN interface."""
 
     VERSION = 1
+    MINOR_VERSION = 2
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}

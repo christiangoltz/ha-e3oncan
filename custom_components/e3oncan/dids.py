@@ -5,6 +5,13 @@ The selection mirrors the read-only sensors of open3e-ha
 DIDs an ECU does not support are detected on the first poll and then skipped.
 """
 
+# Values that change quickly (power, compressor, valve, fans): every 10 s.
+# Everything else that open3e-ha reads every 5 s (temperatures): every 30 s.
+FAST = 10
+SLOW = 30
+_VITOCAL_FAST = {1190, 1775, 1776, 2346, 2351, 2352, 2486, 2487, 2488, 2496, 2569, 2735, 2791, 2806}
+_VITOAIR_FAST = {1040, 1041}
+
 VITOCAL_DIDS: dict[int, int] = {
     268: 5, 269: 5, 271: 5, 274: 5, 284: 5, 286: 5, 288: 5, 290: 5, 318: 15, 320: 5,
     321: 5, 322: 15, 324: 5, 325: 15, 334: 5, 335: 5, 336: 5, 337: 5, 355: 5, 381: 10,
@@ -28,3 +35,11 @@ VITOAIR_DIDS: dict[int, int] = {
     1040: 10, 1041: 10, 1088: 30, 1089: 30, 2247: 300, 2248: 30, 2328: 10, 2355: 300,
     2403: 30, 2489: 30, 2493: 30, 2760: 300, 2797: 30, 3206: 300,
 }
+
+
+def _tune(dids: dict[int, int], fast: set[int]) -> dict[int, int]:
+    return {did: FAST if did in fast else (SLOW if sec < SLOW else sec) for did, sec in dids.items()}
+
+
+VITOCAL_DIDS = _tune(VITOCAL_DIDS, _VITOCAL_FAST)
+VITOAIR_DIDS = _tune(VITOAIR_DIDS, _VITOAIR_FAST)

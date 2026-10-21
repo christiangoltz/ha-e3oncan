@@ -211,6 +211,16 @@ def _meter_unit(did_name: str, path: tuple[str, ...]) -> str | None:
     return _METER_UNITS.get(did_name)
 
 
+_DEVICE_STATISTICS = ("Minimum", "Maximum", "Average")
+
+
+def is_noise(path: tuple[str, ...]) -> bool:
+    """Values switched off by default: the device's own min/max/average and sensor status."""
+    if not path:
+        return False
+    return path[-1] in _DEVICE_STATISTICS or path[-1] == "Error" or "SensorStatus" in path
+
+
 def is_ignored(did_name: str) -> bool:
     """Data points that never become entities."""
     return any(part in did_name for part in IGNORED_DID_NAME_PARTS)

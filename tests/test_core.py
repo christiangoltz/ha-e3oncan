@@ -235,3 +235,20 @@ def test_vitocal_units_fixed():
     assert dec.describe("548", 24, ("Today",)).unit == "kWh"
     assert dec.describe("1211", 24, ("PastMonth",)).unit == "kWh"
     assert dec.describe("1391", 24, ("CurrentYear",)).unit == "kWh"
+
+
+
+def test_poll_intervals():
+    from e3oncan.dids import VITOAIR_DIDS, VITOCAL_DIDS
+
+    assert VITOCAL_DIDS[268] == 30  # flow temperature: slow
+    assert VITOCAL_DIDS[2488] == 10  # electrical power: fast
+    assert VITOCAL_DIDS[548] == 300  # energy counters keep their interval
+    assert VITOAIR_DIDS[327] == 30 and VITOAIR_DIDS[1040] == 10
+
+
+def test_noise_rule():
+    from e3oncan.decoder import is_noise
+
+    assert is_noise(("Minimum",)) and is_noise(("SensorStatus", "Text")) and is_noise(("Error",))
+    assert not is_noise(("Actual",)) and not is_noise(("ErrorState",)) and not is_noise(())

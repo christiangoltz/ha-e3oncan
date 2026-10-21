@@ -22,6 +22,7 @@ from .const import (
     DEVICE_VAIR_READ,
     DEVICE_VX3,
     READ_DEVICES,
+    UNAVAILABLE_VALUES,
     SIGNAL_NEW_VALUES,
     SIGNAL_UPDATE,
 )
@@ -57,6 +58,8 @@ class E3Hub:
         self.infos: dict[str, ValueInfo] = {}
         # DIDs seen on the bus that have no (working) codec: did.len -> details
         self.unknown: dict[str, dict[str, str]] = {}
+        # "<did>.<len>" of data points whose sensor is not connected
+        self.absent: set[str] = set()
         min_interval = entry.options.get(CONF_MIN_INTERVAL, DEFAULT_MIN_INTERVAL)
         self.collector: CanCollector | UdsPoller
         if self.is_read:
@@ -128,6 +131,19 @@ class E3Hub:
             if is_new:
                 async_dispatcher_send(self.hass, f"{self.signal_update}_diagnostics")
             return
+
+        # a sensor that is not connected reports -3276.8 as its actual value:
+        # do not create entities for it, and drop the ones created earlier
+        absent = any(
+            info.path == ("Actual",) and value in UNAVAILABLE_VALUES for info, value in values
+        )
+        if absent:
+            prefix = f"{did}.{len(payload)}"
+            if prefix not in self.absent:
+                self.absent.add(prefix)
+                async_dispatcher_send(self.hass, f"{self.signal_new}_absent", prefix)
+            return
+        self.absent.discard(f"{did}.{len(payload)}")
 
         new: list[ValueInfo] = []
         for info, value in values:
