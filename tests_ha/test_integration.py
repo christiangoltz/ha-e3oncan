@@ -154,3 +154,49 @@ async def test_old_topology_entities_are_removed(hass: HomeAssistant) -> None:
     assert reg.async_get(old.entity_id) is None
     with patch(PATCH_STOP):
         assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_read_mode_vitocal(hass: HomeAssistant) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN, data={"can_interface": "can0", "device": "vcal_read"}, options={"min_interval": 10}, unique_id="can0_vcal_read_0x680"
+    )
+    entry.add_to_hass(hass)
+    with patch("custom_components.e3oncan.poller.UdsPoller.start"), patch("custom_components.e3oncan.poller.UdsPoller.stop"):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        hub = entry.runtime_data
+        assert hub.ecu == 0x680 and type(hub.collector).__name__ == "UdsPoller"
+        # FlowTemperatureSensor 24.9 °C, then an unconnected sensor (-3276.8)
+        hub._on_payload("268", struct.pack("<hhhhB", 249, 160, 711, 250, 0))
+        hub._on_payload("284", struct.pack("<hhhhB", -32768, -32768, -32768, -32768, 0))
+        await hass.async_block_till_done()
+        reg = er.async_get(hass)
+        ents = {e.unique_id.split("_", 1)[1]: e.entity_id for e in er.async_entries_for_config_entry(reg, entry.entry_id)}
+        flow = hass.states.get(ents["268.9/Actual"])
+        assert flow.state == "24.9" and flow.attributes["device_class"] == "temperature"
+        assert hass.states.get(ents["284.9/Actual"]).state == "unknown"
+        dev = __import__("homeassistant.helpers.device_registry", fromlist=["x"]).async_get(hass)
+        model = next(iter(dev.devices.values())).model
+        assert "read-only polling of ECU 0x680" in model
+        assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_e380_names_two_meters(hass: HomeAssistant) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, data={"can_interface": "can0", "device": "e380"}, options={"min_interval": 0})
+    entry.add_to_hass(hass)
+    with patch(PATCH_START), patch(PATCH_STOP):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    hub = entry.runtime_data
+    data = struct.pack("<hhhh", 1, 2, 3, 6)
+    hub._on_payload(str(0x250), data)
+    hub._on_payload(str(0x251), data)
+    hub._on_payload(str(0x25C), bytes(8))
+    await hass.async_block_till_done()
+    reg = er.async_get(hass)
+    ents = {e.unique_id.split("_", 1)[1]: e for e in er.async_entries_for_config_entry(reg, entry.entry_id)}
+    assert hass.states.get(ents[f"{0x250}.8/Total"].entity_id).name.endswith("Meter 1 Grid Active Power Total")
+    assert hass.states.get(ents[f"{0x251}.8/Total"].entity_id).name.endswith("Meter 2 Grid Active Power Total")
+    assert ents[f"{0x25C}.8/ImportCumulated"].disabled_by is er.RegistryEntryDisabler.INTEGRATION
+    with patch(PATCH_STOP):
+        assert await hass.config_entries.async_unload(entry.entry_id)

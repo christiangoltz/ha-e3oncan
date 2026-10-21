@@ -3,15 +3,15 @@
     "step": {
       "user": {
         "title": "Listen to a Viessmann E3 device",
-        "description": "Reads the data the device broadcasts on the CAN bus. Nothing is ever sent to the bus. The CAN interface must already be up (for example by the open3e app at 250 kbit/s).",
+        "description": "Passive: reads what the device broadcasts on the CAN bus and never sends anything. Query: asks for values with read requests only (UDS ReadDataByIdentifier); this integration contains no write command. The CAN interface must already be up (e.g. by the open3e app at 250 kbit/s).",
         "data": {
           "device": "Device type",
           "can_interface": "CAN interface",
-          "can_id": "CAN ID (optional)",
+          "can_id": "CAN ID / ECU address (optional)",
           "min_interval": "Minimum time between updates of a data point"
         },
         "data_description": {
-          "can_id": "Leave empty for the default of the device type (0x451 for Vitocharge VX3, Vitoair and Vitodens, 0x693 for Vitocal). Not used for energy meters.",
+          "can_id": "Leave empty for the default. Passive: 0x451 (VX3, Vitoair, Vitodens), 0x693 (Vitocal). Query: ECU 0x680 (Vitocal), 0x6a2 (Vitoair). Not used for energy meters and the bus scan.",
           "min_interval": "Devices repeat their data many times per minute. A longer interval keeps the database smaller. 0 = every message."
         }
       }
@@ -37,10 +37,12 @@
   "selector": {
     "device": {
       "options": {
-        "vx3": "Vitocharge VX3 (inverter / battery)",
-        "vcal": "Vitocal (heat pump)",
-        "vair": "Vitoair (ventilation)",
-        "vdens": "Vitodens (gas boiler)",
+        "vx3": "Vitocharge VX3 (inverter / battery, passive)",
+        "vcal_read": "Vitocal – query values (read-only)",
+        "vair_read": "Vitoair – query values (read-only)",
+        "vcal": "Vitocal (heat pump, passive)",
+        "vair": "Vitoair (ventilation, passive)",
+        "vdens": "Vitodens (gas boiler, passive)",
         "e380": "Energy meter E380",
         "e3100cb": "Energy meter E3100CB",
         "scan": "Bus scan (find out what is broadcast)"

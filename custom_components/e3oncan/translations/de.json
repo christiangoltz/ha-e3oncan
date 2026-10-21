@@ -3,15 +3,15 @@
     "step": {
       "user": {
         "title": "Viessmann-E3-Gerät mitlesen",
-        "description": "Liest die Daten, die das Gerät auf dem CAN-Bus sendet. Es wird nie etwas auf den Bus geschrieben. Die CAN-Schnittstelle muss bereits aktiv sein (z. B. durch die open3e-App mit 250 kbit/s).",
+        "description": "Mitlesen: liest, was das Gerät von selbst auf dem CAN-Bus sendet, und sendet nie etwas. Abfragen: fragt Werte mit reinen Leseanfragen (UDS ReadDataByIdentifier) ab; es gibt keinen Schreibbefehl in dieser Integration. Die CAN-Schnittstelle muss bereits aktiv sein (z. B. durch die open3e-App mit 250 kbit/s).",
         "data": {
           "device": "Gerätetyp",
           "can_interface": "CAN-Schnittstelle",
-          "can_id": "CAN-ID (optional)",
+          "can_id": "CAN-ID / ECU-Adresse (optional)",
           "min_interval": "Mindestabstand zwischen Aktualisierungen eines Datenpunkts"
         },
         "data_description": {
-          "can_id": "Leer lassen für den Standard des Gerätetyps (0x451 für Vitocharge VX3, Vitoair und Vitodens, 0x693 für Vitocal). Bei Energiezählern nicht verwendet.",
+          "can_id": "Leer lassen für den Standard. Mitlesen: 0x451 (VX3, Vitoair, Vitodens), 0x693 (Vitocal). Abfragen: ECU 0x680 (Vitocal), 0x6a2 (Vitoair). Bei Energiezählern und Bus-Scan nicht verwendet.",
           "min_interval": "Die Geräte wiederholen ihre Daten mehrmals pro Minute. Ein größerer Abstand hält die Datenbank klein. 0 = jede Nachricht."
         }
       }
@@ -37,10 +37,12 @@
   "selector": {
     "device": {
       "options": {
-        "vx3": "Vitocharge VX3 (Wechselrichter / Batterie)",
-        "vcal": "Vitocal (Wärmepumpe)",
-        "vair": "Vitoair (Lüftung)",
-        "vdens": "Vitodens (Gastherme)",
+        "vx3": "Vitocharge VX3 (Wechselrichter / Batterie, mitlesen)",
+        "vcal_read": "Vitocal – Werte abfragen (nur lesen)",
+        "vair_read": "Vitoair – Werte abfragen (nur lesen)",
+        "vcal": "Vitocal (Wärmepumpe, mitlesen)",
+        "vair": "Vitoair (Lüftung, mitlesen)",
+        "vdens": "Vitodens (Gastherme, mitlesen)",
         "e380": "Energiezähler E380",
         "e3100cb": "Energiezähler E3100CB",
         "scan": "Bus-Scan (herausfinden, was gesendet wird)"

@@ -10,6 +10,8 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .collector import CanCollector, split_scan_key
+from .dids import VITOAIR_DIDS, VITOCAL_DIDS
+from .poller import UdsPoller
 from .const import (
     CONF_CAN_ID,
     CONF_CAN_INTERFACE,
@@ -17,7 +19,9 @@ from .const import (
     CONF_MIN_INTERVAL,
     DEFAULT_MIN_INTERVAL,
     DEVICE_SCAN,
+    DEVICE_VAIR_READ,
     DEVICE_VX3,
+    READ_DEVICES,
     SIGNAL_NEW_VALUES,
     SIGNAL_UPDATE,
 )
@@ -39,8 +43,14 @@ class E3Hub:
         can_id = entry.data.get(CONF_CAN_ID)
         self.can_id: int | None = int(can_id, 0) if can_id else None
         self.is_scan = self.device == DEVICE_SCAN
-        # the scan names data points with the common E3 tables
-        self.decoder = Decoder(DEVICE_VX3 if self.is_scan else self.device)
+        self.is_read = self.device in READ_DEVICES
+        if self.is_read:
+            default_ecu, table_device = READ_DEVICES[self.device]
+            self.ecu = self.can_id if self.can_id is not None else default_ecu
+        else:
+            # the scan names data points with the common E3 tables
+            table_device = DEVICE_VX3 if self.is_scan else self.device
+        self.decoder = Decoder(table_device)
         # bus scan: CAN ID -> {did.len: data point name}
         self.scan: dict[str, dict[str, str]] = {}
         self.values: dict[str, Any] = {}
@@ -48,13 +58,24 @@ class E3Hub:
         # DIDs seen on the bus that have no (working) codec: did.len -> details
         self.unknown: dict[str, dict[str, str]] = {}
         min_interval = entry.options.get(CONF_MIN_INTERVAL, DEFAULT_MIN_INTERVAL)
-        self.collector = CanCollector(
-            self.interface,
-            self.device,
-            self.can_id,
-            self._on_payload,
-            min_interval=float(min_interval),
-        )
+        self.collector: CanCollector | UdsPoller
+        if self.is_read:
+            dids = VITOAIR_DIDS if self.device == DEVICE_VAIR_READ else VITOCAL_DIDS
+            self.collector = UdsPoller(
+                self.interface,
+                self.ecu,
+                dids,
+                self._on_payload,
+                min_interval=float(min_interval),
+            )
+        else:
+            self.collector = CanCollector(
+                self.interface,
+                self.device,
+                self.can_id,
+                self._on_payload,
+                min_interval=float(min_interval),
+            )
         self.signal_new = SIGNAL_NEW_VALUES.format(entry_id=entry.entry_id)
         self.signal_update = SIGNAL_UPDATE.format(entry_id=entry.entry_id)
 

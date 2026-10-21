@@ -23,7 +23,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import E3ConfigEntry
-from .const import DEVICE_NAMES, DOMAIN
+from .const import DEVICE_E380, DEVICE_NAMES, DOMAIN, UNAVAILABLE_VALUES
 from .decoder import ValueInfo, is_ignored, parse_key
 from .hub import E3Hub
 
@@ -52,6 +52,9 @@ _UNIT_CLASSES: dict[str, tuple[SensorDeviceClass | None, SensorStateClass | None
     "%": (None, SensorStateClass.MEASUREMENT),
 }
 _ENERGY_UNITS = {"Wh", "kWh", "MWh"}
+_PRECISION = {"kWh": 2, "MWh": 3, "Wh": 0, "W": 0, "kW": 2, "var": 0, "VA": 0, "°C": 1, "V": 0, "A": 1, "Hz": 2}
+# E380: 0x25C/0x25D repeat the import counter of 0x258/0x259 in a coarser format
+_E380_DUPLICATES = {str(0x25C), str(0x25D)}
 _STORAGE_WORDS = ("StateOf", "Capacity", "Remaining")
 
 
@@ -95,11 +98,12 @@ def _enabled_by_default(info: ValueInfo) -> bool:
 
 def device_info(hub: E3Hub) -> DeviceInfo:
     name = DEVICE_NAMES.get(hub.device, hub.device)
+    how = f"read-only polling of ECU {hub.ecu:#x}" if hub.is_read else "passive CAN"
     return DeviceInfo(
         identifiers={(DOMAIN, hub.entry.entry_id)},
         name=name,
         manufacturer="Viessmann",
-        model=f"{name} (passive CAN, {hub.interface})",
+        model=f"{name} ({how}, {hub.interface})",
     )
 
 
@@ -203,10 +207,17 @@ class E3ValueSensor(E3BaseSensor):
         device_class, state_class = _classes(info, unit)
         self._numeric = unit is not None
         self._attr_name = _entity_name(info)
+        if hub.device == DEVICE_E380 and info.did.isdigit():
+            # even CAN IDs: meter with CAN address 97, odd: address 98
+            self._attr_name = f"Meter {1 if int(info.did) % 2 == 0 else 2} {self._attr_name}"
+        if unit in _PRECISION:
+            self._attr_suggested_display_precision = _PRECISION[unit]
         self._attr_native_unit_of_measurement = unit
         self._attr_device_class = device_class
         self._attr_state_class = state_class
-        self._attr_entity_registry_enabled_default = _enabled_by_default(info)
+        self._attr_entity_registry_enabled_default = _enabled_by_default(info) and not (
+            hub.device == DEVICE_E380 and info.did in _E380_DUPLICATES
+        )
         self._attr_extra_state_attributes = {"did": info.did, "did_name": info.did_name}
         if info.path:
             self._attr_extra_state_attributes["path"] = "/".join(info.path)
@@ -221,7 +232,9 @@ class E3ValueSensor(E3BaseSensor):
         if value is None:
             return None
         if self._numeric:
-            return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+            if not isinstance(value, (int, float)) or isinstance(value, bool):
+                return None
+            return None if value in UNAVAILABLE_VALUES else value
         if isinstance(value, bool):
             return str(value)
         if isinstance(value, (int, float)):

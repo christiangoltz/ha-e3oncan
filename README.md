@@ -1,6 +1,9 @@
 # E3onCAN for Home Assistant
 
-Passively reads **Viessmann E3** devices from the CAN bus and turns their data into Home Assistant sensors – **read-only, nothing is ever sent to the bus**.
+Reads **Viessmann E3** devices from the CAN bus and turns their data into Home Assistant sensors – **strictly read-only**:
+
+- **Passive** device types only listen to what devices broadcast; nothing is ever sent to the bus.
+- **Query** device types (Vitocal, Vitoair) ask a controller for values with UDS *ReadDataByIdentifier* (service 0x22) – the same read requests open3e uses. The integration contains no code that writes data or changes any setting.
 
 E3 devices broadcast much of their data unasked ("Collect" protocol). This integration listens to those broadcasts. That makes it useful where active reading (e.g. with [open3e](https://github.com/open3e/open3e)) is rejected – for example a **Vitocharge VX3** that answers UDS requests with `ConditionsNotCorrect`.
 
@@ -16,6 +19,10 @@ It is a Home Assistant port of [E3onCAN](https://github.com/MyHomeMyData/E3onCAN
 | Vitodens (gas boiler) | `vdens` | 0x451 |
 | Energy meter E380 CA | `e380` | 0x250–0x25D |
 | Energy meter E3100CB | `e3100cb` | 0x569 |
+| Vitocal – query (read-only) | `vcal_read` | ECU 0x680 |
+| Vitoair – query (read-only) | `vair_read` | ECU 0x6A2 |
+
+Query mode polls a fixed list of data points (the read-only ones open3e-ha uses), each at its own interval but not more often than the configured minimum. Data points the controller does not support are detected and skipped. Do not run another UDS client (e.g. open3e-ha polling through open3e) against the same controller at the same time.
 
 As in E3onCAN: data of a *slave* device (e.g. the VX3) is usually broadcast on the **external** CAN bus, data of the *master* (e.g. Vitocal) on the internal one.
 

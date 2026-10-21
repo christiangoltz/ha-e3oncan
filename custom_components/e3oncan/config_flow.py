@@ -32,6 +32,7 @@ from .const import (
     DEVICES,
     DOMAIN,
     E3_DEFAULT_CAN_ID,
+    READ_DEVICES,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -79,7 +80,8 @@ class E3onCANConfigFlow(ConfigFlow, domain=DOMAIN):
                     errors["base"] = "cannot_connect"
 
             if not errors:
-                effective_id = can_id if can_id is not None else E3_DEFAULT_CAN_ID.get(device)
+                default_id = READ_DEVICES[device][0] if device in READ_DEVICES else E3_DEFAULT_CAN_ID.get(device)
+                effective_id = can_id if can_id is not None else default_id
                 suffix = f"_{effective_id:#05x}" if effective_id is not None else ""
                 await self.async_set_unique_id(f"{interface}_{device}{suffix}")
                 self._abort_if_unique_id_configured()
