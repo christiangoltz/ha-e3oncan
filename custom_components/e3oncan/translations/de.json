@@ -19,7 +19,7 @@
     "error": {
       "cannot_connect": "Die CAN-Schnittstelle konnte nicht geöffnet werden. Prüfe den Namen und ob sie aktiv ist.",
       "invalid_can_id": "Gib die CAN-ID als Zahl ein, z. B. 0x451.",
-      "can_id_not_allowed": "Energiezähler nutzen feste CAN-IDs; lass das Feld leer."
+      "can_id_not_allowed": "Für Energiezähler und den Bus-Scan wird keine CAN-ID angegeben; lass das Feld leer."
     },
     "abort": {
       "already_configured": "Dieses Gerät wird auf dieser Schnittstelle bereits mitgelesen."
@@ -42,7 +42,8 @@
         "vair": "Vitoair (Lüftung)",
         "vdens": "Vitodens (Gastherme)",
         "e380": "Energiezähler E380",
-        "e3100cb": "Energiezähler E3100CB"
+        "e3100cb": "Energiezähler E3100CB",
+        "scan": "Bus-Scan (herausfinden, was gesendet wird)"
       }
     }
   },
@@ -53,6 +54,12 @@
       },
       "unknown": {
         "name": "Unbekannte Datenpunkte"
+      },
+      "scan_can_id": {
+        "name": "Collect-Daten auf {can_id}"
+      },
+      "scan_overview": {
+        "name": "Aktive CAN-IDs"
       }
     }
   }

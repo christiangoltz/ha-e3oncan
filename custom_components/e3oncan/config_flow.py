@@ -27,6 +27,7 @@ from .const import (
     DEVICE_E380,
     DEVICE_E3100CB,
     DEVICE_NAMES,
+    DEVICE_SCAN,
     DEVICE_VX3,
     DEVICES,
     DOMAIN,
@@ -67,7 +68,7 @@ class E3onCANConfigFlow(ConfigFlow, domain=DOMAIN):
                 can_id = _parse_can_id(user_input.get(CONF_CAN_ID, ""))
             except ValueError:
                 errors[CONF_CAN_ID] = "invalid_can_id"
-            if can_id is not None and device in (DEVICE_E380, DEVICE_E3100CB):
+            if can_id is not None and device in (DEVICE_E380, DEVICE_E3100CB, DEVICE_SCAN):
                 errors[CONF_CAN_ID] = "can_id_not_allowed"
 
             if not errors:

@@ -19,7 +19,7 @@
     "error": {
       "cannot_connect": "The CAN interface could not be opened. Check the name and that it is up.",
       "invalid_can_id": "Enter the CAN ID as a number, e.g. 0x451.",
-      "can_id_not_allowed": "Energy meters use fixed CAN IDs; leave this field empty."
+      "can_id_not_allowed": "Energy meters and the bus scan use no CAN ID; leave this field empty."
     },
     "abort": {
       "already_configured": "This device is already being listened to on this interface."
@@ -42,7 +42,8 @@
         "vair": "Vitoair (ventilation)",
         "vdens": "Vitodens (gas boiler)",
         "e380": "Energy meter E380",
-        "e3100cb": "Energy meter E3100CB"
+        "e3100cb": "Energy meter E3100CB",
+        "scan": "Bus scan (find out what is broadcast)"
       }
     }
   },
@@ -53,6 +54,12 @@
       },
       "unknown": {
         "name": "Unknown data points"
+      },
+      "scan_can_id": {
+        "name": "Collect data on {can_id}"
+      },
+      "scan_overview": {
+        "name": "Active CAN IDs"
       }
     }
   }

@@ -6,6 +6,7 @@ frames from the bus; it never transmits. Nothing here imports Home Assistant.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Callable, Iterable
 import logging
 import threading
@@ -15,6 +16,7 @@ from typing import Any
 from .const import (
     DEVICE_E380,
     DEVICE_E3100CB,
+    DEVICE_SCAN,
     E380_CAN_IDS,
     E3100CB_CAN_ID,
     E3_DEFAULT_CAN_ID,
@@ -89,8 +91,10 @@ class CollectParser:
         self._on_payload(str(did), payload)
 
 
-def can_filters(device: str, can_id: int | None) -> list[dict[str, Any]]:
-    """SocketCAN filters for the frames a device type broadcasts."""
+def can_filters(device: str, can_id: int | None) -> list[dict[str, Any]] | None:
+    """SocketCAN filters for the frames a device type broadcasts (None = all frames)."""
+    if device == DEVICE_SCAN:
+        return None
     if device == DEVICE_E380:
         ids: Iterable[int] = E380_CAN_IDS
     elif device == DEVICE_E3100CB:
@@ -119,6 +123,34 @@ class FrameRouter:
             self._parser.feed(bytes(data))
 
 
+def scan_key(can_id: int, did: str) -> str:
+    return f"{can_id:#05x}/{did}"
+
+
+def split_scan_key(key: str) -> tuple[str, str]:
+    can_id, _, did = key.partition("/")
+    return can_id, did
+
+
+class ScanRouter:
+    """Bus scan: count frames per CAN ID and parse Collect messages on every ID."""
+
+    def __init__(self, on_payload: FrameCallback) -> None:
+        self._on_payload = on_payload
+        self._parsers: dict[int, CollectParser] = {}
+        self.frames: Counter[int] = Counter()
+
+    def handle(self, arbitration_id: int, data: bytes) -> None:
+        self.frames[arbitration_id] += 1
+        parser = self._parsers.get(arbitration_id)
+        if parser is None:
+            parser = CollectParser(
+                lambda did, payload, cid=arbitration_id: self._on_payload(scan_key(cid, did), payload)
+            )
+            self._parsers[arbitration_id] = parser
+        parser.feed(bytes(data))
+
+
 class CanCollector:
     """Read one SocketCAN interface in a background thread."""
 
@@ -137,7 +169,11 @@ class CanCollector:
         self._min_interval = min_interval
         self._next_allowed: dict[str, float] = {}
         self._on_payload = on_payload
-        self._router = FrameRouter(device, self._throttled)
+        self.router: FrameRouter | ScanRouter = (
+            ScanRouter(self._throttled)
+            if device == DEVICE_SCAN
+            else FrameRouter(device, self._throttled)
+        )
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self.frames_received = 0
@@ -182,7 +218,7 @@ class CanCollector:
                             continue
                         self.frames_received += 1
                         try:
-                            self._router.handle(msg.arbitration_id, msg.data)
+                            self.router.handle(msg.arbitration_id, msg.data)
                         except Exception:  # noqa: BLE001 - keep listening
                             _LOGGER.exception("Error handling CAN frame %s", msg)
             except Exception as err:  # noqa: BLE001 - interface down, unplugged, ...

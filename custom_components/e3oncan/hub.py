@@ -9,13 +9,15 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from .collector import CanCollector
+from .collector import CanCollector, split_scan_key
 from .const import (
     CONF_CAN_ID,
     CONF_CAN_INTERFACE,
     CONF_DEVICE,
     CONF_MIN_INTERVAL,
     DEFAULT_MIN_INTERVAL,
+    DEVICE_SCAN,
+    DEVICE_VX3,
     SIGNAL_NEW_VALUES,
     SIGNAL_UPDATE,
 )
@@ -36,7 +38,11 @@ class E3Hub:
         self.interface: str = entry.data[CONF_CAN_INTERFACE]
         can_id = entry.data.get(CONF_CAN_ID)
         self.can_id: int | None = int(can_id, 0) if can_id else None
-        self.decoder = Decoder(self.device)
+        self.is_scan = self.device == DEVICE_SCAN
+        # the scan names data points with the common E3 tables
+        self.decoder = Decoder(DEVICE_VX3 if self.is_scan else self.device)
+        # bus scan: CAN ID -> {did.len: data point name}
+        self.scan: dict[str, dict[str, str]] = {}
         self.values: dict[str, Any] = {}
         self.infos: dict[str, ValueInfo] = {}
         # DIDs seen on the bus that have no (working) codec: did.len -> details
@@ -60,8 +66,29 @@ class E3Hub:
 
     # Runs in the collector thread.
     def _on_payload(self, did: str, payload: bytes) -> None:
+        if self.is_scan:
+            can_id, real_did = split_scan_key(did)
+            codec = self.decoder.codec_for(real_did, len(payload))
+            name = codec.id if codec is not None else "unknown"
+            self.hass.loop.call_soon_threadsafe(
+                self._apply_scan, can_id, f"{real_did}.{len(payload)}", name
+            )
+            return
         values, error = self.decoder.decode(did, payload)
         self.hass.loop.call_soon_threadsafe(self._apply, did, payload, values, error)
+
+    @callback
+    def _apply_scan(self, can_id: str, did: str, name: str) -> None:
+        dids = self.scan.get(can_id)
+        is_new_id = dids is None
+        if is_new_id:
+            dids = self.scan[can_id] = {}
+        if did in dids:
+            return
+        dids[did] = name
+        if is_new_id:
+            async_dispatcher_send(self.hass, f"{self.signal_new}_scan", can_id)
+        async_dispatcher_send(self.hass, f"{self.signal_update}_scan_{can_id}")
 
     @callback
     def _apply(

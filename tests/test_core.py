@@ -200,3 +200,30 @@ def test_overrides_from_real_vx3_frames():
 
     pcc = flat("1603", "0000eafd")
     assert pcc[("ReactivePower",)][0] == "var"
+
+
+def test_scan_router_separates_can_ids():
+    from e3oncan.collector import ScanRouter, split_scan_key
+
+    got = []
+    router = ScanRouter(lambda key, p: got.append((split_scan_key(key), p)))
+    a = struct.pack("<hH", 100, 0)
+    b = struct.pack("<iii", 1, 2, 3)
+    fa, fb = frames_for(1834, a), frames_for(1831, b)
+    # interleave frames of two CAN IDs; each ID keeps its own parser state
+    router.handle(0x693, fb[0])
+    router.handle(0x451, fa[0])
+    for f in fb[1:]:
+        router.handle(0x693, f)
+    router.handle(0x693, bytes(8))
+    assert (("0x451", "1834"), a) in got and (("0x693", "1831"), b) in got
+    assert router.frames[0x693] == 4 and router.frames[0x451] == 1
+
+
+def test_bus_topology_is_ignored():
+    dec = Decoder("vx3")
+    name = next(c.id for k, c in dec.table.items() if "BusTopology" in c.id)
+    key = next(k for k, c in dec.table.items() if c.id == name)
+    did, _, did_len = key.rpartition(".")
+    values, err = dec.decode(did, bytes(int(did_len)))
+    assert values == [] and err is None

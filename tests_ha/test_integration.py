@@ -114,3 +114,43 @@ async def test_options_flow(hass: HomeAssistant) -> None:
     assert entry.options == {"min_interval": 30}
     with patch(PATCH_STOP):
         assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_bus_scan_entry(hass: HomeAssistant) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN, data={"can_interface": "can0", "device": "scan"}, options={"min_interval": 0}, unique_id="can0_scan"
+    )
+    entry.add_to_hass(hass)
+    with patch(PATCH_START), patch(PATCH_STOP):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    hub = entry.runtime_data
+    hub.collector.router.frames.update({0x451: 10, 0x693: 5, 0x680: 3})
+    hub._on_payload("0x451/1834", struct.pack("<hH", 1, 0))
+    hub._on_payload("0x451/1836", struct.pack("<i", 1))
+    hub._on_payload("0x693/268", bytes(9))
+    await hass.async_block_till_done()
+    reg = er.async_get(hass)
+    ents = {e.unique_id.split("_", 1)[1]: e.entity_id for e in er.async_entries_for_config_entry(reg, entry.entry_id)}
+    s451 = hass.states.get(ents["scan_0x451"])
+    assert s451.state == "2"
+    assert s451.attributes["data_points"]["1834.4"] == "ElectricalEnergyStorageStateOfEnergy"
+    assert hass.states.get(ents["scan_0x693"]).attributes["data_points"]["268.9"] == "FlowTemperatureSensor"
+    with patch(PATCH_STOP):
+        assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_old_topology_entities_are_removed(hass: HomeAssistant) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, data={"can_interface": "can0", "device": "vx3"}, options={"min_interval": 0})
+    entry.add_to_hass(hass)
+    from custom_components.e3oncan.decoder import Decoder
+
+    key = next(k for k, c in Decoder("vx3").table.items() if "BusTopology" in c.id)
+    reg = er.async_get(hass)
+    old = reg.async_get_or_create("sensor", DOMAIN, f"{entry.entry_id}_{key}/Count", config_entry=entry)
+    with patch(PATCH_START), patch(PATCH_STOP):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    assert reg.async_get(old.entity_id) is None
+    with patch(PATCH_STOP):
+        assert await hass.config_entries.async_unload(entry.entry_id)

@@ -32,10 +32,14 @@ As in E3onCAN: data of a *slave* device (e.g. the VX3) is usually broadcast on t
 3. *Settings → Devices & services → Add integration → E3onCAN*.
 4. Choose the device type and CAN interface. Add one entry per device you want to listen to.
 
+## Finding out what your bus broadcasts
+
+Add an entry with device type **Bus scan**. It listens to all CAN IDs and creates one diagnostic sensor per CAN ID that carries Collect data, listing the data points seen there (attribute `data_points`), plus *Active CAN IDs* with frame counts per ID. Use it to pick the right CAN ID for each device, then remove the scan entry.
+
 ## What you get
 
 - Sensors are **created automatically** as data points arrive, with units, device and state classes (power, energy, temperature, …), so they work in the energy dashboard.
-- Raw/unknown parts and enum IDs are created **disabled** – enable them if you need them.
+- Raw/unknown parts, enum IDs and month/year matrices are created **disabled** – enable them if you need them. Bus topology data is not exposed at all.
 - Diagnostic sensors: *CAN frames received* and *Unknown data points* (DIDs on the bus without a codec, with their raw data as attribute – useful for improving the definitions upstream).
 - Option *minimum time between updates of a data point* (default 10 s) keeps the database small; devices repeat their data many times per minute.
 

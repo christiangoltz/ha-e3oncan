@@ -24,7 +24,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import E3ConfigEntry
 from .const import DEVICE_NAMES, DOMAIN
-from .decoder import ValueInfo, parse_key
+from .decoder import ValueInfo, is_ignored, parse_key
 from .hub import E3Hub
 
 DIAG_FRAMES = "diag_frames"
@@ -109,6 +109,9 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     hub = entry.runtime_data
+    if hub.is_scan:
+        _setup_scan(hass, entry, hub, async_add_entities)
+        return
     created: set[str] = set()
     prefix = f"{entry.entry_id}_"
 
@@ -125,6 +128,10 @@ async def async_setup_entry(
             continue
         info = hub.decoder.describe(*parsed)
         if info is None:
+            continue
+        if is_ignored(info.did_name):
+            # created by an earlier version; these are no longer offered
+            registry.async_remove(reg.entity_id)
             continue
         created.add(key)
         restored.append(E3ValueSensor(hub, info))
@@ -145,6 +152,26 @@ async def async_setup_entry(
     entry.async_on_unload(async_dispatcher_connect(hass, hub.signal_new, _new_values))
     # values that arrived before the dispatcher was connected
     _new_values(list(hub.infos.values()))
+
+
+def _setup_scan(
+    hass: HomeAssistant,
+    entry: E3ConfigEntry,
+    hub: E3Hub,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    created: set[str] = set()
+
+    @callback
+    def _new_id(can_id: str) -> None:
+        if can_id not in created:
+            created.add(can_id)
+            async_add_entities([E3ScanSensor(hub, can_id)])
+
+    async_add_entities([E3FramesSensor(hub), E3ScanOverviewSensor(hub)])
+    entry.async_on_unload(async_dispatcher_connect(hass, f"{hub.signal_new}_scan", _new_id))
+    for can_id in list(hub.scan):
+        _new_id(can_id)
 
 
 class E3BaseSensor(SensorEntity):
@@ -250,3 +277,60 @@ class E3UnknownSensor(E3BaseSensor):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return {"data_points": dict(sorted(self._hub.unknown.items()))}
+
+
+class E3ScanSensor(E3BaseSensor):
+    """Bus scan: Collect data points broadcast on one CAN ID."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "scan_can_id"
+    _attr_native_unit_of_measurement = "data points"
+    _unrecorded_attributes = frozenset({"data_points"})
+
+    def __init__(self, hub: E3Hub, can_id: str) -> None:
+        super().__init__(hub, f"scan_{can_id}")
+        self._can_id = can_id
+        self._attr_translation_placeholders = {"can_id": can_id}
+
+    def _signal(self) -> str:
+        return f"{self._hub.signal_update}_scan_{self._can_id}"
+
+    @property
+    def native_value(self) -> int:
+        return len(self._hub.scan.get(self._can_id, {}))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        frames = self._hub.collector.router.frames.get(int(self._can_id, 16), 0)
+        return {
+            "can_id": self._can_id,
+            "frames": frames,
+            "data_points": dict(sorted(self._hub.scan.get(self._can_id, {}).items(), key=lambda kv: int(kv[0].split(".")[0]))),
+        }
+
+
+class E3ScanOverviewSensor(E3BaseSensor):
+    """Bus scan: frames per CAN ID, including IDs without Collect data."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "scan_overview"
+    _attr_should_poll = True
+    _unrecorded_attributes = frozenset({"frames_per_can_id"})
+
+    def __init__(self, hub: E3Hub) -> None:
+        super().__init__(hub, "scan_overview")
+
+    async def async_added_to_hass(self) -> None:
+        """Polled; no dispatcher needed."""
+
+    @property
+    def native_value(self) -> int:
+        return len(self._hub.collector.router.frames)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        frames = self._hub.collector.router.frames
+        return {
+            "frames_per_can_id": {f"{cid:#05x}": n for cid, n in frames.most_common(60)},
+            "can_ids_with_collect_data": sorted(self._hub.scan),
+        }

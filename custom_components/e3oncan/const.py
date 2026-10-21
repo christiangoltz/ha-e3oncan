@@ -16,8 +16,9 @@ DEVICE_VAIR = "vair"
 DEVICE_VDENS = "vdens"
 DEVICE_E380 = "e380"
 DEVICE_E3100CB = "e3100cb"
+DEVICE_SCAN = "scan"
 
-DEVICES = [DEVICE_VX3, DEVICE_VCAL, DEVICE_VAIR, DEVICE_VDENS, DEVICE_E380, DEVICE_E3100CB]
+DEVICES = [DEVICE_VX3, DEVICE_VCAL, DEVICE_VAIR, DEVICE_VDENS, DEVICE_E380, DEVICE_E3100CB, DEVICE_SCAN]
 
 DEVICE_NAMES = {
     DEVICE_VX3: "Vitocharge VX3",
@@ -26,6 +27,7 @@ DEVICE_NAMES = {
     DEVICE_VDENS: "Vitodens",
     DEVICE_E380: "Energy meter E380",
     DEVICE_E3100CB: "Energy meter E3100CB",
+    DEVICE_SCAN: "E3 bus scan",
 }
 
 # CAN IDs the devices broadcast their "Collect" data on (from E3onCAN).
@@ -40,3 +42,6 @@ E3100CB_CAN_ID = 0x569
 
 SIGNAL_NEW_VALUES = f"{DOMAIN}_new_values_{{entry_id}}"
 SIGNAL_UPDATE = f"{DOMAIN}_update_{{entry_id}}"
+
+# Data points that never become entities (pure bus bookkeeping).
+IGNORED_DID_NAME_PARTS = ("BusTopology",)

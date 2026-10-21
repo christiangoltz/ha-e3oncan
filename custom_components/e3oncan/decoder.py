@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import logging
 from typing import Any
 
-from .const import DEVICE_E380, DEVICE_E3100CB
+from .const import DEVICE_E380, DEVICE_E3100CB, IGNORED_DID_NAME_PARTS
 from .e3 import (
     E3onCANcodecs,
     E3onCANdatapointsE380,
@@ -152,6 +152,8 @@ class Decoder:
         codec = self.codec_for(did, len(data))
         if codec is None:
             return None, "no codec"
+        if is_ignored(codec.id):
+            return [], None
         try:
             decoded = codec.decode(bytes(data))
         except Exception as err:  # noqa: BLE001 - vendored codecs raise anything
@@ -203,6 +205,11 @@ def _meter_unit(did_name: str, path: tuple[str, ...]) -> str | None:
     if did_name == "GridState":
         return None
     return _METER_UNITS.get(did_name)
+
+
+def is_ignored(did_name: str) -> bool:
+    """Data points that never become entities."""
+    return any(part in did_name for part in IGNORED_DID_NAME_PARTS)
 
 
 def parse_key(key: str) -> tuple[str, int, tuple[str, ...]] | None:
