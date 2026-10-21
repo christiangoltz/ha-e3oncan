@@ -1,0 +1,59 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Listen to a Viessmann E3 device",
+        "description": "Reads the data the device broadcasts on the CAN bus. Nothing is ever sent to the bus. The CAN interface must already be up (for example by the open3e app at 250 kbit/s).",
+        "data": {
+          "device": "Device type",
+          "can_interface": "CAN interface",
+          "can_id": "CAN ID (optional)",
+          "min_interval": "Minimum time between updates of a data point"
+        },
+        "data_description": {
+          "can_id": "Leave empty for the default of the device type (0x451 for Vitocharge VX3, Vitoair and Vitodens, 0x693 for Vitocal). Not used for energy meters.",
+          "min_interval": "Devices repeat their data many times per minute. A longer interval keeps the database smaller. 0 = every message."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "The CAN interface could not be opened. Check the name and that it is up.",
+      "invalid_can_id": "Enter the CAN ID as a number, e.g. 0x451.",
+      "can_id_not_allowed": "Energy meters use fixed CAN IDs; leave this field empty."
+    },
+    "abort": {
+      "already_configured": "This device is already being listened to on this interface."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "min_interval": "Minimum time between updates of a data point"
+        }
+      }
+    }
+  },
+  "selector": {
+    "device": {
+      "options": {
+        "vx3": "Vitocharge VX3 (inverter / battery)",
+        "vcal": "Vitocal (heat pump)",
+        "vair": "Vitoair (ventilation)",
+        "vdens": "Vitodens (gas boiler)",
+        "e380": "Energy meter E380",
+        "e3100cb": "Energy meter E3100CB"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "frames": {
+        "name": "CAN frames received"
+      },
+      "unknown": {
+        "name": "Unknown data points"
+      }
+    }
+  }
+}

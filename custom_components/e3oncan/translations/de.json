@@ -1,0 +1,59 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Viessmann-E3-Gerät mitlesen",
+        "description": "Liest die Daten, die das Gerät auf dem CAN-Bus sendet. Es wird nie etwas auf den Bus geschrieben. Die CAN-Schnittstelle muss bereits aktiv sein (z. B. durch die open3e-App mit 250 kbit/s).",
+        "data": {
+          "device": "Gerätetyp",
+          "can_interface": "CAN-Schnittstelle",
+          "can_id": "CAN-ID (optional)",
+          "min_interval": "Mindestabstand zwischen Aktualisierungen eines Datenpunkts"
+        },
+        "data_description": {
+          "can_id": "Leer lassen für den Standard des Gerätetyps (0x451 für Vitocharge VX3, Vitoair und Vitodens, 0x693 für Vitocal). Bei Energiezählern nicht verwendet.",
+          "min_interval": "Die Geräte wiederholen ihre Daten mehrmals pro Minute. Ein größerer Abstand hält die Datenbank klein. 0 = jede Nachricht."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Die CAN-Schnittstelle konnte nicht geöffnet werden. Prüfe den Namen und ob sie aktiv ist.",
+      "invalid_can_id": "Gib die CAN-ID als Zahl ein, z. B. 0x451.",
+      "can_id_not_allowed": "Energiezähler nutzen feste CAN-IDs; lass das Feld leer."
+    },
+    "abort": {
+      "already_configured": "Dieses Gerät wird auf dieser Schnittstelle bereits mitgelesen."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "min_interval": "Mindestabstand zwischen Aktualisierungen eines Datenpunkts"
+        }
+      }
+    }
+  },
+  "selector": {
+    "device": {
+      "options": {
+        "vx3": "Vitocharge VX3 (Wechselrichter / Batterie)",
+        "vcal": "Vitocal (Wärmepumpe)",
+        "vair": "Vitoair (Lüftung)",
+        "vdens": "Vitodens (Gastherme)",
+        "e380": "Energiezähler E380",
+        "e3100cb": "Energiezähler E3100CB"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "frames": {
+        "name": "Empfangene CAN-Frames"
+      },
+      "unknown": {
+        "name": "Unbekannte Datenpunkte"
+      }
+    }
+  }
+}

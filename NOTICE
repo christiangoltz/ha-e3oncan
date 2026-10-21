@@ -1,0 +1,10 @@
+ha-e3oncan
+Copyright 2026 Christian Goltz
+
+This integration bundles data point definitions and codecs from
+E3onCAN (https://github.com/MyHomeMyData/E3onCAN), Copyright 2023 MyHomeMyData,
+which is based on open3e (https://github.com/open3e/open3e), Copyright 2023 abnoname.
+Both are licensed under the Apache License, Version 2.0.
+The bundled files are in custom_components/e3oncan/e3/; only their import
+statements were changed. The receive loop in collector.py is a port of
+E3onCAN's E3onCANcollect.py.

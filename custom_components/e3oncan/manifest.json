@@ -1,0 +1,13 @@
+{
+  "domain": "e3oncan",
+  "name": "E3onCAN (Viessmann E3, passive CAN)",
+  "codeowners": ["@christiangoltz"],
+  "config_flow": true,
+  "documentation": "https://github.com/christiangoltz/ha-e3oncan",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/christiangoltz/ha-e3oncan/issues",
+  "loggers": ["can", "udsoncan"],
+  "requirements": ["python-can==4.6.1", "udsoncan==1.26.1"],
+  "version": "0.1.0"
+}
