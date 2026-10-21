@@ -1,8 +1,8 @@
 """Sensors for values decoded from the CAN bus.
 
 Entities are created as data points arrive. Entities known from earlier runs
-are restored from the entity registry at startup, so they keep their history
-and show as unavailable until the device broadcasts them again.
+are restored from the entity registry at startup, so they keep their history,
+and show their last value until the device broadcasts them again.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ import re
 from typing import Any
 
 from homeassistant.components.sensor import (
+    RestoreSensor,
     SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
@@ -56,6 +57,8 @@ _PRECISION = {"kWh": 2, "MWh": 3, "Wh": 0, "W": 0, "kW": 2, "var": 0, "VA": 0, "
 # E380: 0x25C/0x25D repeat the import counter of 0x258/0x259 in a coarser format
 _E380_DUPLICATES = {str(0x25C), str(0x25D)}
 _STORAGE_WORDS = ("StateOf", "Capacity", "Remaining")
+# percentages (pump speeds, ...) report 255 when there is no value
+_NO_PERCENT = 255
 
 
 def _classes(info: ValueInfo, unit: str | None) -> tuple[SensorDeviceClass | None, SensorStateClass | None]:
@@ -71,6 +74,8 @@ def _classes(info: ValueInfo, unit: str | None) -> tuple[SensorDeviceClass | Non
         return SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING
     if unit == "%" and ("StateOfCharge" in name or "SoC" in name):
         return SensorDeviceClass.BATTERY, SensorStateClass.MEASUREMENT
+    if unit == "h" and info.path and info.path[-1] in ("Remaining", "Overdue"):
+        return SensorDeviceClass.DURATION, SensorStateClass.MEASUREMENT
     return _UNIT_CLASSES.get(unit, (None, SensorStateClass.MEASUREMENT))
 
 
@@ -206,17 +211,20 @@ class E3BaseSensor(SensorEntity):
         return f"{self._hub.signal_update}_{self._key}"
 
     async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
         self.async_on_remove(
             async_dispatcher_connect(self.hass, self._signal(), self.async_write_ha_state)
         )
 
 
-class E3ValueSensor(E3BaseSensor):
+class E3ValueSensor(E3BaseSensor, RestoreSensor):
     """One decoded value of one data point."""
 
     def __init__(self, hub: E3Hub, info: ValueInfo) -> None:
         super().__init__(hub, info.key)
         self._info = info
+        # last value from before a restart, shown until the device sends a new one
+        self._restored: Any = None
         unit = _UNIT_FIXES.get(info.unit, info.unit) if info.unit else None
         device_class, state_class = _classes(info, unit)
         self._numeric = unit is not None
@@ -242,19 +250,33 @@ class E3ValueSensor(E3BaseSensor):
         if info.path:
             self._attr_extra_state_attributes["path"] = "/".join(info.path)
 
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if self._key in self._hub.values:
+            return
+        last = await self.async_get_last_sensor_data()
+        if last is not None and last.native_unit_of_measurement == self._attr_native_unit_of_measurement:
+            self._restored = last.native_value
+
     @property
     def available(self) -> bool:
-        return self._key in self._hub.values
+        return self._key in self._hub.values or self._restored is not None
 
     @property
     def native_value(self) -> Any:
-        value = self._hub.values.get(self._key)
+        if self._key not in self._hub.values:
+            return self._restored
+        value = self._hub.values[self._key]
         if value is None:
             return None
         if self._numeric:
             if not isinstance(value, (int, float)) or isinstance(value, bool):
                 return None
-            return None if value in UNAVAILABLE_VALUES else value
+            if value in UNAVAILABLE_VALUES:
+                return None
+            if self._attr_native_unit_of_measurement == "%" and value == _NO_PERCENT:
+                return None
+            return value
         if isinstance(value, bool):
             return str(value)
         if isinstance(value, (int, float)):

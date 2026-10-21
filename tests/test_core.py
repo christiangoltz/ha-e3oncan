@@ -238,6 +238,26 @@ def test_vitocal_units_fixed():
 
 
 
+def test_vitoair_and_vitocal_name_units():
+    import struct
+
+    vair = Decoder("vair")
+    assert vair.describe("327", 9, ("Actual",)).unit == "°C"
+    assert vair.describe("2247", 12, ("Remaining",)).unit == "h"
+    assert vair.describe("2328", 4, ("TargetFlow",)).unit == "m³/h"
+    # fan speed is the raw value in rpm
+    values, _ = vair.decode("1040", bytes(3) + struct.pack("<h", 1247) + bytes(1))
+    fan = {info.path: (value, info.unit) for info, value in values}
+    assert fan[("Actual",)] == (1247, "rpm")
+    vcal = Decoder("vcal")
+    assert vcal.describe("381", 4, ("Actual",)).unit == "%"
+    assert vcal.describe("2622", 9, ("EnergyThermal",)).unit == "kWh"
+    assert vcal.describe("2622", 9, ("CurrentYear",)).unit is None
+    assert vcal.describe("2629", 4, ()).unit == "W"
+    # the heat pump compressor is no pump
+    assert vcal.describe("2369", 14, ("starts",)).unit is None
+
+
 def test_poll_intervals():
     from e3oncan.dids import VITOAIR_DIDS, VITOCAL_DIDS
 

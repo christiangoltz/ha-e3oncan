@@ -19,7 +19,7 @@ from .e3 import (
     Open3Edatapoints,
     Open3EdatapointsVariants,
 )
-from .overrides import E3_OVERRIDES, E3_UNIT_REPLACE, E3_UNITS, is_energy_period
+from .overrides import E3_OVERRIDES, E3_UNIT_REPLACE, E3_UNITS, is_energy_period, name_unit
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -179,10 +179,13 @@ class Decoder:
         if unit is None:
             if self.device in (DEVICE_E380, DEVICE_E3100CB):
                 unit = _meter_unit(codec.id, path)
-            elif path:
-                unit = E3_UNITS.get((codec.id, path[-1]))
-                if unit is None and is_energy_period(codec.id, path[-1]):
+            else:
+                sub = path[-1] if path else ""
+                unit = E3_UNITS.get((codec.id, sub))
+                if unit is None and is_energy_period(codec.id, sub):
                     unit = "kWh"
+                if unit is None and not _is_raw(leaf):
+                    unit = name_unit(codec.id, sub)
         if unit is not None and codec.id in E3_UNIT_REPLACE:
             unit = E3_UNIT_REPLACE[codec.id]
         if unit == "VA" and path and "ReactivePower" in path[-1]:

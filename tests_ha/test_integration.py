@@ -89,13 +89,13 @@ async def test_values_create_sensors(hass: HomeAssistant) -> None:
     await hass.async_block_till_done()
     assert hass.states.get(soe.entity_id).state == "3000.0"
 
-    # restart: entity is restored from the registry and unavailable until data arrives
+    # restart: entity is restored from the registry and keeps its last value until data arrives
     with patch(PATCH_STOP):
         assert await hass.config_entries.async_unload(entry.entry_id)
     with patch(PATCH_START), patch(PATCH_STOP):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-    assert hass.states.get(soe.entity_id).state == "unavailable"
+    assert hass.states.get(soe.entity_id).state == "3000.0"
     entry.runtime_data._on_payload("1834", struct.pack("<hH", 3100, 0))
     await hass.async_block_till_done()
     assert hass.states.get(soe.entity_id).state == "3100.0"

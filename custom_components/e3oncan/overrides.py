@@ -42,6 +42,17 @@ E3_OVERRIDES = {
             RawCodec(4, "Unknown2"),
         ],
     ),
+    # Vitoair fans: upstream divides the speed by 10; the raw value is rpm.
+    "1040.6": O3EComplexType(
+        6,
+        "SupplyAirFan",
+        [RawCodec(3, "Unknown1"), O3EInt16(2, "Actual", scale=1.0, signed=True, unit="rpm"), RawCodec(1, "Unknown2")],
+    ),
+    "1041.6": O3EComplexType(
+        6,
+        "ExhaustAirFan",
+        [RawCodec(3, "Unknown1"), O3EInt16(2, "Actual", scale=1.0, signed=True, unit="rpm"), RawCodec(1, "Unknown2")],
+    ),
 }
 
 # Units for upstream definitions that have none: (did name, sub value) -> unit
@@ -59,6 +70,37 @@ E3_UNITS = {
     ("ElectricalEnergyInverterPowerAc", "ActivePower"): "W",
     ("ElectricalEnergyInverterPowerAc", "ReactivePower"): "var",
 }
+
+_SENSOR_VALUES = ("Actual", "Minimum", "Maximum", "Average")
+
+# Units for whole groups of upstream definitions that have none (mostly
+# Vitoair and Vitocal values read by polling):
+# (end of the data point name, sub values or None for all) -> unit
+E3_NAME_UNITS = (
+    ("TemperatureSensor", _SENSOR_VALUES, "°C"),
+    ("MinimumVentilationSupplyAirTemperature", None, "°C"),
+    ("FrostProtectionConfiguration", ("Temperature",), "°C"),
+    ("HumiditySensor", _SENSOR_VALUES, "%"),
+    ("CurrentVentilationHeatRecovery", None, "%"),
+    ("FilterRuntime", None, "h"),
+    ("VentilationCurrentVolumeFlow", None, "m³/h"),
+    ("ThreeWayValvePositionPercent", None, "%"),
+    ("Pump", ("TargetValue", "Actual", "ActualValue"), "%"),
+    ("PumpStatus", ("Actual",), "%"),
+    ("PumpMinimumMaximumLimit", None, "%"),
+    ("CompressorMinMaxSpeedHeating", None, "%"),
+    ("DesiredThermalCapacity", None, "W"),
+)
+
+
+def name_unit(did_name: str, sub: str) -> str | None:
+    """Unit from E3_NAME_UNITS, or the energy of a seasonal performance counter."""
+    if did_name.startswith("Seasonal") and sub in ("EnergyThermal", "EnergyElectric"):
+        return "kWh"
+    for suffix, subs, unit in E3_NAME_UNITS:
+        if did_name.endswith(suffix) and (subs is None or sub in subs):
+            return unit
+    return None
 
 
 # Units that are wrong upstream: did name -> correct unit for all its values
