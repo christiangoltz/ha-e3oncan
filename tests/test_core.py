@@ -227,3 +227,11 @@ def test_bus_topology_is_ignored():
     did, _, did_len = key.rpartition(".")
     values, err = dec.decode(did, bytes(int(did_len)))
     assert values == [] and err is None
+
+
+def test_vitocal_units_fixed():
+    dec = Decoder("vcal")
+    assert dec.describe("318", 9, ("Actual",)).unit == "bar"
+    assert dec.describe("548", 24, ("Today",)).unit == "kWh"
+    assert dec.describe("1211", 24, ("PastMonth",)).unit == "kWh"
+    assert dec.describe("1391", 24, ("CurrentYear",)).unit == "kWh"

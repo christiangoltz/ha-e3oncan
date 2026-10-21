@@ -59,3 +59,19 @@ E3_UNITS = {
     ("ElectricalEnergyInverterPowerAc", "ActivePower"): "W",
     ("ElectricalEnergyInverterPowerAc", "ReactivePower"): "var",
 }
+
+
+# Units that are wrong upstream: did name -> correct unit for all its values
+E3_UNIT_REPLACE = {
+    "WaterPressureSensor": "bar",  # upstream says hPa, the values are bar
+}
+
+# Period counters (Today, Past7Days, ...) of these data points are kWh
+ENERGY_PERIODS = ("Today", "Past7Days", "CurrentMonth", "PastMonth", "CurrentYear", "PastYear")
+
+
+def is_energy_period(did_name: str, sub: str) -> bool:
+    return sub in ENERGY_PERIODS and (
+        did_name.startswith("EnergyConsumption")
+        or (did_name.startswith("Generated") and did_name.endswith("Output"))
+    )

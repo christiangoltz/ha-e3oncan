@@ -65,6 +65,9 @@ def _classes(info: ValueInfo, unit: str | None) -> tuple[SensorDeviceClass | Non
     if unit in _ENERGY_UNITS:
         if any(word in name for word in _STORAGE_WORDS):
             return SensorDeviceClass.ENERGY_STORAGE, SensorStateClass.MEASUREMENT
+        if info.path and info.path[-1].startswith("Past"):
+            # rolling / closed periods (past 7 days, last month, ...) are no counters
+            return SensorDeviceClass.ENERGY, None
         return SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING
     if unit == "%" and ("StateOfCharge" in name or "SoC" in name):
         return SensorDeviceClass.BATTERY, SensorStateClass.MEASUREMENT
@@ -215,7 +218,6 @@ class E3ValueSensor(E3BaseSensor):
                 name=f"{DEVICE_NAMES[DEVICE_E380]} {meter}",
                 manufacturer="Viessmann",
                 model=f"E380 CA (CAN address {96 + meter})",
-                via_device=(DOMAIN, hub.entry.entry_id),
             )
         if unit in _PRECISION:
             self._attr_suggested_display_precision = _PRECISION[unit]
