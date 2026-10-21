@@ -179,3 +179,24 @@ def test_collector_end_to_end_on_virtual_bus():
         collector.stop()
     assert got == [("1831", payload)]
     assert collector.frames_received == 4
+
+
+def test_overrides_from_real_vx3_frames():
+    """Raw payloads captured on a Vitocharge VX3 (Oct 2026)."""
+    dec = Decoder("vx3")
+    flat = lambda did, raw: {i.path: (i.unit, v) for i, v in dec.decode(did, bytes.fromhex(raw))[0]}
+
+    phase1 = flat("378", "04002bff040000002bffffff")
+    assert phase1[("ActivePower",)] == ("W", 4.0)
+    assert phase1[("ReactivePower",)] == ("var", -213.0)
+    assert flat("380", "edff4bffedffffff4bffffff")[("ActivePower",)] == ("W", -19.0)
+    assert flat("1810", "9301d80093010000d8000000")[("ActivePower",)] == ("W", 403.0)
+
+    report = flat("3366", (-406).to_bytes(4, "little", signed=True).hex() + "00" * 12)
+    assert report[("15MinPower",)] == ("W", -406.0)
+
+    inverter = flat("1824", "94010000860000008600000086000000")
+    assert inverter[("cumulated",)] == ("W", 404.0)
+
+    pcc = flat("1603", "0000eafd")
+    assert pcc[("ReactivePower",)][0] == "var"

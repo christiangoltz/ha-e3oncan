@@ -86,6 +86,9 @@ def _enabled_by_default(info: ValueInfo) -> bool:
         return False
     if info.did_name.lower().startswith("unknown"):
         return False
+    # bus topology and month/year matrices: dozens of values nobody needs by default
+    if "BusTopology" in info.did_name or "Matrix" in info.did_name:
+        return False
     # enum values come as {"ID": n, "Text": "..."}; the text is enough
     return not (info.path and info.path[-1] == "ID")
 

@@ -19,6 +19,7 @@ from .e3 import (
     Open3Edatapoints,
     Open3EdatapointsVariants,
 )
+from .overrides import E3_OVERRIDES, E3_UNITS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,10 +65,12 @@ def build_did_table(device: str) -> dict[str, Any]:
         return _full_did_table(E3onCANdatapointsE380.dataIdentifiersE380)
     if device == DEVICE_E3100CB:
         return _full_did_table(E3onCANdatapointsE3100CB.dataIdentifiersE3100CB)
-    return _full_did_table(
+    table = _full_did_table(
         Open3Edatapoints.dataIdentifiers["dids"],
         Open3EdatapointsVariants.dataIdentifiers["dids"],
     )
+    table.update(E3_OVERRIDES)
+    return table
 
 
 def _sub_codec(codec: Any, part: str) -> Any | None:
@@ -171,8 +174,14 @@ class Decoder:
                 return None
         leaf = _leaf_codec(codec, path) if path else codec
         unit = getattr(leaf, "unit", None) or None
-        if unit is None and self.device in (DEVICE_E380, DEVICE_E3100CB):
-            unit = _meter_unit(codec.id, path)
+        if unit is None:
+            if self.device in (DEVICE_E380, DEVICE_E3100CB):
+                unit = _meter_unit(codec.id, path)
+            elif path:
+                unit = E3_UNITS.get((codec.id, path[-1]))
+        if unit == "VA" and path and "ReactivePower" in path[-1]:
+            # upstream labels reactive power with the apparent power unit
+            unit = "var"
         return ValueInfo(
             key=make_key(did, did_len, path),
             did=did,
