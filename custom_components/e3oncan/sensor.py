@@ -208,8 +208,15 @@ class E3ValueSensor(E3BaseSensor):
         self._numeric = unit is not None
         self._attr_name = _entity_name(info)
         if hub.device == DEVICE_E380 and info.did.isdigit():
-            # even CAN IDs: meter with CAN address 97, odd: address 98
-            self._attr_name = f"Meter {1 if int(info.did) % 2 == 0 else 2} {self._attr_name}"
+            # even CAN IDs: meter with CAN address 97, odd: address 98 -> one device each
+            meter = 1 if int(info.did) % 2 == 0 else 2
+            self._attr_device_info = DeviceInfo(
+                identifiers={(DOMAIN, f"{hub.entry.entry_id}_meter{meter}")},
+                name=f"{DEVICE_NAMES[DEVICE_E380]} {meter}",
+                manufacturer="Viessmann",
+                model=f"E380 CA (CAN address {96 + meter})",
+                via_device=(DOMAIN, hub.entry.entry_id),
+            )
         if unit in _PRECISION:
             self._attr_suggested_display_precision = _PRECISION[unit]
         self._attr_native_unit_of_measurement = unit

@@ -195,8 +195,14 @@ async def test_e380_names_two_meters(hass: HomeAssistant) -> None:
     await hass.async_block_till_done()
     reg = er.async_get(hass)
     ents = {e.unique_id.split("_", 1)[1]: e for e in er.async_entries_for_config_entry(reg, entry.entry_id)}
-    assert hass.states.get(ents[f"{0x250}.8/Total"].entity_id).name.endswith("Meter 1 Grid Active Power Total")
-    assert hass.states.get(ents[f"{0x251}.8/Total"].entity_id).name.endswith("Meter 2 Grid Active Power Total")
+    from homeassistant.helpers import device_registry as dr
+
+    devreg = dr.async_get(hass)
+    m1 = devreg.async_get(ents[f"{0x250}.8/Total"].device_id)
+    m2 = devreg.async_get(ents[f"{0x251}.8/Total"].device_id)
+    assert m1.name == "Energy meter E380 1" and m2.name == "Energy meter E380 2"
+    assert m1.id != m2.id
+    assert hass.states.get(ents[f"{0x250}.8/Total"].entity_id).name == "Energy meter E380 1 Grid Active Power Total"
     assert ents[f"{0x25C}.8/ImportCumulated"].disabled_by is er.RegistryEntryDisabler.INTEGRATION
     with patch(PATCH_STOP):
         assert await hass.config_entries.async_unload(entry.entry_id)

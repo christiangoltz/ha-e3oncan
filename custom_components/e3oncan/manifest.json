@@ -9,5 +9,5 @@
   "issue_tracker": "https://github.com/christiangoltz/ha-e3oncan/issues",
   "loggers": ["can", "udsoncan", "isotp"],
   "requirements": ["python-can==4.6.1", "udsoncan==1.26.1", "can-isotp==2.0.7"],
-  "version": "0.3.0"
+  "version": "0.3.1"
 }
