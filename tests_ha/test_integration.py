@@ -176,6 +176,12 @@ async def test_read_mode_vitocal(hass: HomeAssistant) -> None:
         assert flow.state == "24.9" and flow.attributes["device_class"] == "temperature"
         # not connected -> no entities at all for this data point
         assert not any(k.startswith("284.9") for k in ents)
+        # a desired energy is a setpoint, no counter
+        hub._on_payload("2256", struct.pack("<h", 10065))
+        await hass.async_block_till_done()
+        ents = {e.unique_id.split("_", 1)[1]: e.entity_id for e in er.async_entries_for_config_entry(reg, entry.entry_id)}
+        defrost = hass.states.get(next(v for k, v in ents.items() if k.startswith("2256.")))
+        assert defrost.attributes.get("device_class") == "energy" and "state_class" not in defrost.attributes
         # the device's own minimum is created disabled
         assert reg.async_get(ents["268.9/Minimum"]).disabled_by is er.RegistryEntryDisabler.INTEGRATION
         dev = __import__("homeassistant.helpers.device_registry", fromlist=["x"]).async_get(hass)

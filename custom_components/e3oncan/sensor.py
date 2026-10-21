@@ -68,8 +68,8 @@ def _classes(info: ValueInfo, unit: str | None) -> tuple[SensorDeviceClass | Non
     if unit in _ENERGY_UNITS:
         if any(word in name for word in _STORAGE_WORDS):
             return SensorDeviceClass.ENERGY_STORAGE, SensorStateClass.MEASUREMENT
-        if info.path and info.path[-1].startswith("Past"):
-            # rolling / closed periods (past 7 days, last month, ...) are no counters
+        if (info.path and info.path[-1].startswith("Past")) or info.did_name.startswith("Desired"):
+            # rolling / closed periods (past 7 days, last month, ...) and setpoints are no counters
             return SensorDeviceClass.ENERGY, None
         return SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING
     if unit == "%" and ("StateOfCharge" in name or "SoC" in name):
